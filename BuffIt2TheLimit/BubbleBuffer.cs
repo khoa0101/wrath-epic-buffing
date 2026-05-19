@@ -2198,15 +2198,21 @@ namespace BuffIt2TheLimit {
                         buff.SetUnitWants(me, false);
                     } else {
                         buff.SetUnitWants(me, true);
-                        // Mutual exclusivity: if this activatable belongs to a group, un-want any other activatable in the same group for this unit
+                        // Per-group cap is dynamic: features like Master of Many Styles (PrestigePlus)
+                        // or Aeon's mythic gaze raise the Style/Gaze cap above the default of 1 via
+                        // IncreaseActivatableAbilityGroupSize. Only deselect others if adding this one
+                        // would push the wanted count past UnitPartActivatableAbility.GetGroupSize.
                         if (buff.IsActivatable && buff.ActivatableGroup != Kingmaker.UnitLogic.ActivatableAbilities.ActivatableAbilityGroup.None) {
-                            foreach (var other in state.BuffList) {
-                                if (other == buff) continue;
-                                if (!other.IsActivatable) continue;
-                                if (other.ActivatableGroup != buff.ActivatableGroup) continue;
-                                if (other.UnitWants(me)) {
-                                    other.SetUnitWants(me, false);
-                                }
+                            int cap = me.Get<UnitPartActivatableAbility>()?.GetGroupSize(buff.ActivatableGroup) ?? 1;
+                            var otherWanted = state.BuffList
+                                .Where(o => o != buff && o.IsActivatable
+                                         && o.ActivatableGroup == buff.ActivatableGroup
+                                         && o.UnitWants(me))
+                                .ToList();
+                            int idx = 0;
+                            while (1 + otherWanted.Count - idx > cap && idx < otherWanted.Count) {
+                                otherWanted[idx].SetUnitWants(me, false);
+                                idx++;
                             }
                         }
                     }
