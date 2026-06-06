@@ -40,3 +40,4 @@ Load when: editing `BuffExecutor.cs`, `EngineCastingHandler.cs`, `AnimatedExecut
 - **`BubbleBuff.IsMass`**: Set in `BufferState.AddBuff()` via `spell.Blueprint.IsMass()`. Mass/communal spells (detected via `AbilityTargetsAround`, `ContextActionPartyMembers`, or name ending in "Communal") use `ValidateMass()` — one credit, one CastTask, all wanted targets marked as given.
 - **`ValidateMass()` target selection**: Iterates `wanted` targets to find one the caster can reach — do NOT use `HashSet.First()` (non-deterministic ordering).
 
+- **`ValidateActivatable` non-song branch must check `caster.Banned`** (after the `IsOn` check — banning blocks activation, not current state). Until v1.14.5 bans on class toggles/equipment activatables were silently ignored. When adding any new provider filter, mirror it in `BubbleBuff.DiagnoseCaster` so [CSD] logs name the real rejection (`"banned"`) instead of `"ok"`.
