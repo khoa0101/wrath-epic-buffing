@@ -16,7 +16,10 @@ namespace BuffIt2TheLimit {
             => serializer.Serialize(writer, ((Dictionary<TKey, TValue>)value).ToList());
 
         public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
-            => serializer.Deserialize<KeyValuePair<TKey, TValue>[]>(reader).ToDictionary(kv => kv.Key, kv => kv.Value);
+            // Deserialize returns null for a null/missing JSON node (old or hand-edited
+            // save files) — fall back to an empty dictionary instead of crashing the load
+            => serializer.Deserialize<KeyValuePair<TKey, TValue>[]>(reader)?.ToDictionary(kv => kv.Key, kv => kv.Value)
+               ?? new Dictionary<TKey, TValue>();
     }
 
     public class SavedBufferState {
@@ -66,8 +69,11 @@ namespace BuffIt2TheLimit {
     public class SavedCasterState {
         [JsonProperty]
         public bool Banned;
+        // -1 = no custom cap (sentinel must match BubbleBuff.CustomCap). A plain 0
+        // default would mean "may never cast" for entries deserialized from saves
+        // that predate this field.
         [JsonProperty]
-        public int Cap;
+        public int Cap = -1;
         [JsonProperty]
         public bool ShareTransmutation;
         [JsonProperty]
@@ -91,7 +97,7 @@ namespace BuffIt2TheLimit {
         public string[] IgnoreForOverwriteCheck;
 
         [JsonProperty]
-        public HashSet<string> Wanted;
+        public HashSet<string> Wanted = new();
         [JsonProperty]
         public List<string> CasterPriority;
         [JsonProperty]

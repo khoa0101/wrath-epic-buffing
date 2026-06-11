@@ -223,7 +223,9 @@ namespace BuffIt2TheLimit {
             SourcePriorityOverride = state.SourcePriorityOverride;
             for (int i = 0; i < Bubble.ConfigGroup.Count; i++) {
                 UnitEntityData u = Bubble.ConfigGroup[i];
-                if (state.Wanted.Contains(u.UniqueId))
+                // Wanted can be null when the JSON holds an explicit null (hand-edited
+                // or very old save) — the field initializer only covers a missing key
+                if (state.Wanted != null && state.Wanted.Contains(u.UniqueId))
                     SetUnitWants(u, true);
             }
             if (state.IgnoreForOverwriteCheck != null) {

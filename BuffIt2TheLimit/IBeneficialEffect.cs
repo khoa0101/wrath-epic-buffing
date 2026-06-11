@@ -86,10 +86,13 @@ namespace BuffIt2TheLimit {
 
         internal bool IsPresent(UnitBuffData unitBuffData, HashSet<Guid> ignoreForOverwriteCheck) {
             if (AppliedPetBuffs != null) {
+                // GetPet returns null when the pet is dead, dismissed, or not summoned
                 var pet = unitBuffData.Unit.GetPet(PetType.Value);
-                var existingBuffs = new HashSet<Guid>(pet.Buffs.RawFacts.Select(b => b.BGuid()));
-                if (existingBuffs.Overlaps(AppliedPetBuffs.Except(ignoreForOverwriteCheck)))
-                    return true;
+                if (pet != null) {
+                    var existingBuffs = new HashSet<Guid>(pet.Buffs.RawFacts.Select(b => b.BGuid()));
+                    if (existingBuffs.Overlaps(AppliedPetBuffs.Except(ignoreForOverwriteCheck)))
+                        return true;
+                }
             }
 
             if (AppliedBuffs != null) {

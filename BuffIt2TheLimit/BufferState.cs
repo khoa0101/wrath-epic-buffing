@@ -653,6 +653,7 @@ namespace BuffIt2TheLimit {
 
         public void Save(bool shallow = false) {
             static void updateSavedBuff(BubbleBuff buff, SavedBuffState save) {
+                save.Wanted ??= new HashSet<string>();
                 save.Blacklisted = buff.HideBecause(HideReason.Blacklisted);
                 save.InGroups = new HashSet<BuffGroup>(buff.InGroups);
                 save.InGroup = buff.InGroups.Count > 0 ? buff.InGroups.First() : BuffGroup.Long;

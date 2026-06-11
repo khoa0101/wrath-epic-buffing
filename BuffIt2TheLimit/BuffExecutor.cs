@@ -525,7 +525,8 @@ namespace BuffIt2TheLimit {
                         tooltip.AddSkip(buff).count = thisBuffSkip;
 
                 } catch (Exception ex) {
-                    Main.Error(ex, $"casting buff: {buff.Spell.Name}");
+                    // buff.Spell is null for songs — Name handles all source types
+                    Main.Error(ex, $"casting buff: {buff.Name}");
                 }
             }
 

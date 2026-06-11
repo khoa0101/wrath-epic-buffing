@@ -782,7 +782,10 @@ namespace BuffIt2TheLimit {
                 toggle.onValueChanged.AddListener(enabled => {
                     state.AllowInCombat = enabled;
                     bool allow = !Game.Instance.Player.IsInCombat || enabled;
-                    GlobalBubbleBuffer.Instance.Buttons.ForEach(b => b.Interactable = allow);
+                    // Buttons accumulates destroyed entries across UI reinstalls
+                    GlobalBubbleBuffer.Instance.Buttons.ForEach(b => {
+                        if (b != null) b.Interactable = allow;
+                    });
                 });
             }
 
@@ -2651,10 +2654,12 @@ namespace BuffIt2TheLimit {
                 lastAlphaLogged = alpha;
             }
 
-            if (src.alpha < 0.1) {
+            if (src == null) return;
+
+            if (alpha < 0.1) {
                 if (!waitingForAlpha)
                     bubbleHud.SetActive(false);
-            } else if (src.alpha > 0.9) {
+            } else if (alpha > 0.9) {
                 waitingForAlpha = false;
                 bubbleHud.SetActive(true);
             }
