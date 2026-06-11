@@ -16,38 +16,60 @@ namespace BuffIt2TheLimit {
         public const int BATCH_SIZE = 8;
         public const float DELAY = 0.05f;
 
-        private RuleCastSpell Cast(CastTask task) {
+        private RuleCastSpell Cast(CastTask task, List<EngineCastingHandler> handlers) {
+            EngineCastingHandler handler = null;
             try {
                 // Subscribe to the RuleCastSpell event that will be executed by the trigger
-                EventBus.Subscribe(new EngineCastingHandler(task, true));
+                handler = new EngineCastingHandler(task, true);
+                handlers.Add(handler);
+                EventBus.Subscribe(handler);
 
                 // Trigger the RuleCastSpell
                 return Rulebook.Trigger<RuleCastSpell>(new(task.SpellToCast, task.Target));
             }
             catch (Exception ex) {
                 Main.Error(ex, "Instant Engine Casting");
+                handler?.EnsureFinalized();
                 return null;
             }
         }
 
         public IEnumerator CreateSpellCastRoutine(List<CastTask> tasks) {
-            var tasks_WithRetentions = tasks.Where(x => x.Retentions.Any);
-            var batches_WithoutRetentions = tasks.Where(x => !x.Retentions.Any).Chunk(BATCH_SIZE);
+            var handlers = new List<EngineCastingHandler>();
+            try {
+                var tasks_WithRetentions = tasks.Where(x => x.Retentions.Any);
+                var batches_WithoutRetentions = tasks.Where(x => !x.Retentions.Any).Chunk(BATCH_SIZE);
 
-            // Batches without retentions
-            foreach (var batch in batches_WithoutRetentions) {
-                batch.ForEach(task => {
-                    Cast(task);
-                });
+                // Batches without retentions
+                foreach (var batch in batches_WithoutRetentions) {
+                    batch.ForEach(task => {
+                        Cast(task, handlers);
+                    });
 
-                yield return new WaitForSeconds(DELAY);
-            }
+                    yield return new WaitForSeconds(DELAY);
+                }
 
-            // Batches with retentions
-            foreach (var task in tasks_WithRetentions) {
-                Cast(task);
+                // Batches with retentions
+                foreach (var task in tasks_WithRetentions) {
+                    Cast(task, handlers);
 
-                yield return new WaitForSeconds(DELAY);
+                    yield return new WaitForSeconds(DELAY);
+                }
+
+                // Grace period: give in-flight AbilityExecutionProcesses a moment to end
+                // and self-finalize via HandleExecutionProcessEnd before the sweep below
+                // rolls back shared state.
+                for (int i = 0; i < 30 && handlers.Any(h => !h.IsFinalized); i++) {
+                    yield return null;
+                }
+            } finally {
+                // Sweep handlers the game never finalized — instant Rulebook.Trigger
+                // casts don't always get an AbilityExecutionProcess, and cancelled
+                // casts never reach HandleExecutionProcessEnd. EnsureFinalized is
+                // idempotent, so double-finalizing the normal path is harmless.
+                foreach (var handler in handlers) {
+                    handler.EnsureFinalized();
+                }
             }
         }
     }

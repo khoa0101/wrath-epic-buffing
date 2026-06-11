@@ -173,6 +173,9 @@ namespace BuffIt2TheLimit {
                 }
             } finally {
                 ArmorBypassActive--;
+                // Propagate disposal so the inner routine's finally (handler sweep)
+                // runs even when this wrapper is stopped externally.
+                (inner as IDisposable)?.Dispose();
             }
         }
 
@@ -181,8 +184,14 @@ namespace BuffIt2TheLimit {
         // size. The flag is set in EngineCastingHandler when RuleCastSpell actually
         // fires, so dropped commands no longer inflate the reported count.
         internal static IEnumerator WithDeferredLog(IEnumerator inner, List<CastTask> tasks, string title, int attempted, int skipped, TooltipTemplateBuffer tooltip) {
-            while (inner.MoveNext()) {
-                yield return inner.Current;
+            try {
+                while (inner.MoveNext()) {
+                    yield return inner.Current;
+                }
+            } finally {
+                // Propagate disposal so the inner routine's finally (handler sweep)
+                // runs even when this wrapper is stopped externally.
+                (inner as IDisposable)?.Dispose();
             }
 
             int applied = tasks.Count(t => t.ActuallyFired);

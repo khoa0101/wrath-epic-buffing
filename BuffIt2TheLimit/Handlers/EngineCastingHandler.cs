@@ -9,9 +9,11 @@ using Kingmaker.RuleSystem;
 using Kingmaker.RuleSystem.Rules.Abilities;
 using Kingmaker.UnitLogic;
 using Kingmaker.UnitLogic.Abilities;
+using Kingmaker.UnitLogic.Abilities.Blueprints;
 using Kingmaker.UnitLogic.Abilities.Components;
 using Kingmaker.Utility;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace BuffIt2TheLimit.Handlers {
@@ -22,6 +24,18 @@ namespace BuffIt2TheLimit.Handlers {
         private readonly bool _spendSpellSlot;
         private ModifiableValue.Modifier _casterLevelModifier;
         private bool _rodMetamagicApplied;
+        private bool _retentionsApplied;
+        private bool _srSuppressed;
+        private bool _finalized;
+
+        // SpellResistance is mutated on the SHARED blueprint. Several handlers can be
+        // alive for the same blueprint at once (two casters buffing with the same spell,
+        // Azata echo). A per-handler prior-value capture lets the second handler capture
+        // the already-suppressed `false` and permanently stick SpellResistance=false.
+        // Refcount per blueprint instead: the first suppressor records the original,
+        // the last restorer writes it back.
+        private static readonly Dictionary<BlueprintAbility, int> SrSuppressCount = new();
+        private static readonly Dictionary<BlueprintAbility, bool> SrOriginal = new();
 
         #endregion
 
@@ -29,10 +43,10 @@ namespace BuffIt2TheLimit.Handlers {
 
         private int ArcaneReservoirPointsAvailable {
             get {
-                return _castTask.Caster?.Resources?.PersistantResources?.Where(x => x.Blueprint.AssetGuidThreadSafe == "cac948cbbe79b55459459dd6a8fe44ce")?.First()?.Amount ?? 0;
+                return _castTask.Caster?.Resources?.PersistantResources?.FirstOrDefault(x => x.Blueprint.AssetGuidThreadSafe == "cac948cbbe79b55459459dd6a8fe44ce")?.Amount ?? 0;
             }
             set {
-                var arcaneReserviorResource = _castTask.Caster?.Resources?.PersistantResources?.Where(x => x.Blueprint.AssetGuidThreadSafe == "cac948cbbe79b55459459dd6a8fe44ce")?.First();
+                var arcaneReserviorResource = _castTask.Caster?.Resources?.PersistantResources?.FirstOrDefault(x => x.Blueprint.AssetGuidThreadSafe == "cac948cbbe79b55459459dd6a8fe44ce");
                 if (arcaneReserviorResource != null) arcaneReserviorResource.Amount = value;
             }
         }
@@ -70,8 +84,6 @@ namespace BuffIt2TheLimit.Handlers {
             }
         }
 
-        private bool PriorSpellResistance { get; set; }
-
         private AbilityExecutionContext Context { get; set; }
 
         #endregion
@@ -82,20 +94,27 @@ namespace BuffIt2TheLimit.Handlers {
             _castTask = castTask;
             _spendSpellSlot = spendSpellSlot;
 
-            // Only apply class-specific features for spell sources
-            if (_castTask.SourceType == BuffSourceType.Spell) {
-                SetAllRetentions();
-                ModifyCasterLevel();
-            }
+            try {
+                // Only apply class-specific features for spell sources
+                if (_castTask.SourceType == BuffSourceType.Spell) {
+                    SetAllRetentions();
+                    ModifyCasterLevel();
+                }
 
-            RemoveSpellResistance();
+                RemoveSpellResistance();
 
-            // Extend Rod metamagic is applied in OnBeforeEventAboutToTrigger, not here.
-            // Applying here would leak to other CastTasks sharing the same SpellToCast.
+                // Extend Rod metamagic is applied in OnBeforeEventAboutToTrigger, not here.
+                // Applying here would leak to other CastTasks sharing the same SpellToCast.
 
-            if (_castTask.SourceType == BuffSourceType.Spell && IsAzataZippyMagicSecondaryCast) {
-                IncreaseSpellSlotsAvailable(_castTask.SpellToCast, _castTask.SpellToCast.SpellSlotCost);
-                AddMaterialComponentsForSpell(_castTask.SpellToCast, _castTask.SpellToCast.SpellSlotCost);
+                if (_castTask.SourceType == BuffSourceType.Spell && IsAzataZippyMagicSecondaryCast) {
+                    IncreaseSpellSlotsAvailable(_castTask.SpellToCast, _castTask.SpellToCast.SpellSlotCost);
+                    AddMaterialComponentsForSpell(_castTask.SpellToCast, _castTask.SpellToCast.SpellSlotCost);
+                }
+            } catch {
+                // The constructor mutates shared state (retentions, BonusCasterLevel,
+                // blueprint SpellResistance). A throw mid-way must not leak any of it.
+                EnsureFinalized();
+                throw;
             }
         }
 
@@ -115,51 +134,71 @@ namespace BuffIt2TheLimit.Handlers {
         /// <param name="context"></param>
         public void HandleExecutionProcessEnd(AbilityExecutionContext context) {
             if (Context != null && Context == context) {
-                try {
-                    if (_castTask.SourceType == BuffSourceType.Spell) {
-                        ReleaseAllRetentions();
-                        RestoreCasterLevel();
-                    }
-                    ResetSpellResistance();
+                EnsureFinalized();
+            }
+        }
 
-                    // Consume resources for non-spell casts
-                    if (_castTask.SourceItem != null) {
-                        try {
-                            if (_castTask.SourceType == BuffSourceType.Scroll || _castTask.SourceType == BuffSourceType.Potion) {
-                                Game.Instance.Player.Inventory.Remove(_castTask.SourceItem, 1);
-                            } else if (_castTask.SourceType == BuffSourceType.Equipment && _castTask.SourceItem.IsSpendCharges) {
-                                _castTask.SourceItem.Charges--;
-                            }
-                        } catch (Exception itemEx) {
-                            Main.Error(itemEx, "Consuming item after cast");
-                        }
-                    }
+        public bool IsFinalized => _finalized;
 
-                    // Restore Extend Rod metamagic state (charge already consumed in OnBefore)
-                    if (_rodMetamagicApplied) {
-                        // Best-effort restore of MetamagicData. Null-safe because the first
-                        // handler to fire may already have restored it when SpellToCast is shared.
-                        try {
-                            if (_castTask.OriginalMetamagicWasNull) {
-                                _castTask.SpellToCast.MetamagicData = null;
-                            } else if (_castTask.SpellToCast.MetamagicData != null) {
-                                _castTask.SpellToCast.MetamagicData.Clear();
-                                _castTask.SpellToCast.MetamagicData.Add(_castTask.OriginalMetamagicMask);
-                                _castTask.SpellToCast.MetamagicData.SpellLevelCost = _castTask.OriginalSpellLevelCost;
-                                _castTask.SpellToCast.MetamagicData.HeightenLevel = _castTask.OriginalHeightenLevel;
-                            }
-                            if (Context?.m_Params != null) {
-                                Context.m_Params.Metamagic = _castTask.OriginalMetamagicMask;
-                            }
-                        } catch (Exception restoreEx) {
-                            Main.Verbose($"Metamagic restore: {restoreEx.Message}");
-                        }
-                    }
-                } catch (Exception ex) {
-                    Main.Error(ex, "Casting: HandleExecutionProcessEnd");
-                } finally {
-                    EventBus.Unsubscribe(this);
+        /// <summary>
+        /// Idempotent rollback + resource accounting + unsubscribe. Called from
+        /// HandleExecutionProcessEnd on the normal path; the execution engines sweep
+        /// every handler still alive at routine end. That covers the paths where
+        /// HandleExecutionProcessEnd never fires: the cast command was silently
+        /// discarded by Commands.Run, the cast was cancelled before the rule fired,
+        /// or the game never created an AbilityExecutionProcess for an instant
+        /// Rulebook.Trigger cast. Without the sweep those paths leak the handler's
+        /// shared-state mutations (retentions, BonusCasterLevel, blueprint
+        /// SpellResistance) permanently.
+        /// </summary>
+        public void EnsureFinalized() {
+            if (_finalized) return;
+            _finalized = true;
+            try {
+                if (_castTask.SourceType == BuffSourceType.Spell) {
+                    ReleaseAllRetentions();
+                    RestoreCasterLevel();
                 }
+                ResetSpellResistance();
+
+                // Consume resources for non-spell casts — only when the rule actually
+                // fired, never for discarded/cancelled casts.
+                if (_castTask.ActuallyFired && _castTask.SourceItem != null) {
+                    try {
+                        if (_castTask.SourceType == BuffSourceType.Scroll || _castTask.SourceType == BuffSourceType.Potion) {
+                            Game.Instance.Player.Inventory.Remove(_castTask.SourceItem, 1);
+                        } else if (_castTask.SourceType == BuffSourceType.Equipment && _castTask.SourceItem.IsSpendCharges) {
+                            _castTask.SourceItem.Charges--;
+                        }
+                    } catch (Exception itemEx) {
+                        Main.Error(itemEx, "Consuming item after cast");
+                    }
+                }
+
+                // Restore Extend Rod metamagic state (charge already consumed in OnBefore)
+                if (_rodMetamagicApplied) {
+                    // Best-effort restore of MetamagicData. Null-safe because the first
+                    // handler to fire may already have restored it when SpellToCast is shared.
+                    try {
+                        if (_castTask.OriginalMetamagicWasNull) {
+                            _castTask.SpellToCast.MetamagicData = null;
+                        } else if (_castTask.SpellToCast.MetamagicData != null) {
+                            _castTask.SpellToCast.MetamagicData.Clear();
+                            _castTask.SpellToCast.MetamagicData.Add(_castTask.OriginalMetamagicMask);
+                            _castTask.SpellToCast.MetamagicData.SpellLevelCost = _castTask.OriginalSpellLevelCost;
+                            _castTask.SpellToCast.MetamagicData.HeightenLevel = _castTask.OriginalHeightenLevel;
+                        }
+                        if (Context?.m_Params != null) {
+                            Context.m_Params.Metamagic = _castTask.OriginalMetamagicMask;
+                        }
+                    } catch (Exception restoreEx) {
+                        Main.Verbose($"Metamagic restore: {restoreEx.Message}");
+                    }
+                }
+            } catch (Exception ex) {
+                Main.Error(ex, "Casting: finalizing cast handler");
+            } finally {
+                EventBus.Unsubscribe(this);
             }
         }
 
@@ -278,12 +317,15 @@ namespace BuffIt2TheLimit.Handlers {
             if (_castTask.Retentions.ImprovedShareTransmutation) _castTask.Caster.State.Features.ImprovedShareTransmutation.Retain();
             if (_castTask.Retentions.PowerfulChange) _castTask.Caster.State.Features.PowerfulChange.Retain();
             if (_castTask.Retentions.ImprovedPowerfulChange) _castTask.Caster.State.Features.ImprovedPowerfulChange.Retain();
+            _retentionsApplied = true;
         }
 
         /// <summary>
         /// Release spell modifier retentions
         /// </summary>
         public void ReleaseAllRetentions() {
+            if (!_retentionsApplied) return;
+            _retentionsApplied = false;
             if (_castTask.Retentions.ShareTransmutation) _castTask.Caster.State.Features.ShareTransmutation.Release();
             if (_castTask.Retentions.ImprovedShareTransmutation) _castTask.Caster.State.Features.ImprovedShareTransmutation.Release();
             if (_castTask.Retentions.PowerfulChange) _castTask.Caster.State.Features.PowerfulChange.Release();
@@ -291,11 +333,28 @@ namespace BuffIt2TheLimit.Handlers {
         }
 
         private void RemoveSpellResistance() {
-            PriorSpellResistance = _castTask.SpellToCast.Blueprint.SpellResistance;
-            _castTask.SpellToCast.Blueprint.SpellResistance = false;
+            var blueprint = _castTask.SpellToCast.Blueprint;
+            if (!SrSuppressCount.TryGetValue(blueprint, out int count) || count == 0) {
+                SrOriginal[blueprint] = blueprint.SpellResistance;
+                count = 0;
+            }
+            SrSuppressCount[blueprint] = count + 1;
+            blueprint.SpellResistance = false;
+            _srSuppressed = true;
         }
 
-        private void ResetSpellResistance() => _castTask.SpellToCast.Blueprint.SpellResistance = PriorSpellResistance;
+        private void ResetSpellResistance() {
+            if (!_srSuppressed) return;
+            _srSuppressed = false;
+            var blueprint = _castTask.SpellToCast.Blueprint;
+            if (SrSuppressCount.TryGetValue(blueprint, out int count) && count > 1) {
+                SrSuppressCount[blueprint] = count - 1;
+            } else {
+                SrSuppressCount.Remove(blueprint);
+                if (SrOriginal.TryGetValue(blueprint, out bool original)) blueprint.SpellResistance = original;
+                SrOriginal.Remove(blueprint);
+            }
+        }
 
         /// <summary>
         /// Decrease arcane pool points
@@ -314,7 +373,9 @@ namespace BuffIt2TheLimit.Handlers {
                 return SpellLevel(spell.ConvertedFrom);
             }
 
-            return ((spell != null) ? spell.Spellbook.GetSpellLevel(spell) : spell.Spellbook.GetMinSpellLevel(spell.Blueprint));
+            // Callers only reach this for spellbook-backed casts; ConvertedFrom recursion
+            // above already dereferenced `spell`, so a null check here would be dead code.
+            return spell.Spellbook.GetSpellLevel(spell);
         }
 
         /// <summary>
@@ -399,7 +460,9 @@ namespace BuffIt2TheLimit.Handlers {
         /// Restore caster level to original state
         /// </summary>
         private void RestoreCasterLevel() {
+            if (_casterLevelModifier == null) return;
             _castTask.Caster.Stats.BonusCasterLevel.RemoveModifier(_casterLevelModifier);
+            _casterLevelModifier = null;
         }
 
         #endregion
