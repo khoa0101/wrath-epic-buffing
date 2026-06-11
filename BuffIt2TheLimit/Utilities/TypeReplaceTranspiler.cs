@@ -28,7 +28,10 @@ namespace BuffIt2TheLimit.Utilities {
             bool replaceLoc3 = false;
             LocalBuilder loc3replacement = null;
 
-            Dictionary<Type, LocalBuilder> locSReplacements = new Dictionary<Type, LocalBuilder>();
+            // Keyed by LocalIndex, not LocalType: two same-type locals at index >= 4
+            // would otherwise crash the Add (duplicate key) — and silently share one
+            // replacement local even if it didn't.
+            Dictionary<int, LocalBuilder> locSReplacements = new Dictionary<int, LocalBuilder>();
 
             foreach (LocalVariableInfo local in original.GetMethodBody().LocalVariables) {
                 if (m_typeMapping.ContainsKey(local.LocalType)) {
@@ -51,7 +54,7 @@ namespace BuffIt2TheLimit.Utilities {
                             loc3replacement = newLocal;
                             break;
                         default:
-                            locSReplacements.Add(local.LocalType, newLocal);
+                            locSReplacements.Add(local.LocalIndex, newLocal);
                             break;
                     }
                 }
@@ -66,8 +69,8 @@ namespace BuffIt2TheLimit.Utilities {
                     yield return new CodeInstruction(OpCodes.Stloc_S, loc2replacement);
                 } else if (code.opcode == OpCodes.Stloc_3 && replaceLoc3) {
                     yield return new CodeInstruction(OpCodes.Stloc_S, loc3replacement);
-                } else if (code.opcode == OpCodes.Stloc_S && locSReplacements.ContainsKey(((LocalBuilder)code.operand).LocalType)) {
-                    yield return new CodeInstruction(OpCodes.Stloc_S, locSReplacements[((LocalBuilder)code.operand).LocalType]);
+                } else if (code.opcode == OpCodes.Stloc_S && locSReplacements.ContainsKey(((LocalBuilder)code.operand).LocalIndex)) {
+                    yield return new CodeInstruction(OpCodes.Stloc_S, locSReplacements[((LocalBuilder)code.operand).LocalIndex]);
                 } else if (code.opcode == OpCodes.Ldloc_0 && replaceLoc0) {
                     yield return new CodeInstruction(OpCodes.Ldloc_S, loc0replacement);
                 } else if (code.opcode == OpCodes.Ldloc_1 && replaceLoc1) {
@@ -76,8 +79,8 @@ namespace BuffIt2TheLimit.Utilities {
                     yield return new CodeInstruction(OpCodes.Ldloc_S, loc2replacement);
                 } else if (code.opcode == OpCodes.Ldloc_3 && replaceLoc3) {
                     yield return new CodeInstruction(OpCodes.Ldloc_S, loc3replacement);
-                } else if (code.opcode == OpCodes.Ldloc_S && locSReplacements.ContainsKey(((LocalBuilder)code.operand).LocalType)) {
-                    yield return new CodeInstruction(OpCodes.Ldloc_S, locSReplacements[((LocalBuilder)code.operand).LocalType]);
+                } else if (code.opcode == OpCodes.Ldloc_S && locSReplacements.ContainsKey(((LocalBuilder)code.operand).LocalIndex)) {
+                    yield return new CodeInstruction(OpCodes.Ldloc_S, locSReplacements[((LocalBuilder)code.operand).LocalIndex]);
                 } else if (code.opcode == OpCodes.Callvirt) {
                     MethodInfo method = (MethodInfo)code.operand;
                     bool replaceMethod = false;

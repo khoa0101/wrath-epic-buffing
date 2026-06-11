@@ -339,7 +339,8 @@ namespace BuffIt2TheLimit.Extensions {
                 Type type = action?.GetType();
                 var foundActions = AccessTools.GetDeclaredFields(type)?
                     .Where(f => f?.FieldType == typeof(ActionList))
-                    .SelectMany(field => ((ActionList)field.GetValue(action)).Actions);
+                    // ActionList fields are frequently null in blueprint data
+                    .SelectMany(field => ((ActionList)field.GetValue(action))?.Actions ?? Array.Empty<GameAction>());
                 if (foundActions != null) { newActions.AddRange(foundActions); }
             }
             if (newActions.Count > 0) {

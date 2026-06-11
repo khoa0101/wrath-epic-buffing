@@ -1030,11 +1030,6 @@ namespace BuffIt2TheLimit {
             });
         }
 
-        private void RegenerateWidgetCache(Transform listPrefab, SpellbookKnownSpellsPCView spellsKnownView) {
-            if (view.widgetCache == null) {
-            }
-        }
-
         public static GameObject buttonPrefab;
         public static GameObject selectedPrefab;
 
@@ -3269,7 +3264,7 @@ namespace BuffIt2TheLimit {
 
     class BubbleSpellView {
         private static TooltipConfig NoInfo = new TooltipConfig { InfoCallPCMethod = InfoCallPCMethod.None };
-        public static void BindBuffToView(BubbleBuff buff, GameObject view, bool tooltipOnRightClickOnly = false) {
+        public static void BindBuffToView(BubbleBuff buff, GameObject view) {
             var button = view.GetComponent<OwlcatButton>();
             string text = buff.Name;
             if (buff.IsMass)
@@ -3500,7 +3495,7 @@ namespace BuffIt2TheLimit {
                             textImage.color = Color.white;
                         }
                     };
-                    BubbleSpellView.BindBuffToView(buff, widget, button);
+                    BubbleSpellView.BindBuffToView(buff, widget);
                     widget.ChildObject("School").SetActive(true);
                     widget.SetActive(true);
 

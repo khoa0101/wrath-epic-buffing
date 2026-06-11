@@ -48,7 +48,8 @@ namespace BuffIt2TheLimit.Config {
                 }
 #endif
             }
-            if (Id == null) { Main.Log($"ERROR: GUID for {name} not found"); }
+            // Guid is a value type — `Id == null` was always false, so the error never logged
+            if (Id == Guid.Empty) { Main.Log($"ERROR: GUID for {name} not found"); }
             UsedGUIDs[name] = Id;
             return new BlueprintGuid(Id);
         }

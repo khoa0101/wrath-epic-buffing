@@ -35,6 +35,7 @@ namespace BuffIt2TheLimit.Utilities {
                 Objects.Clear();
                 Sprites.Clear();
                 Meshes.Clear();
+                Materials.Clear();
             }
         }
 

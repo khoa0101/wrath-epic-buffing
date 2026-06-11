@@ -16,9 +16,9 @@ using BuffIt2TheLimit.Extensions;
 namespace BuffIt2TheLimit.Utilities {
     static class FeatTools {
         public static void AddAsFeat(params BlueprintFeature[] features) {
+            Selections.BasicFeatSelection.AddFeatures(features);
+            Selections.ExtraFeatMythicFeat.AddFeatures(features);
             foreach (var feature in features) {
-                Selections.BasicFeatSelection.AddFeatures(features);
-                Selections.ExtraFeatMythicFeat.AddFeatures(features);
                 Selections.FeatSelections
                     .Where(selection => feature.HasGroup(selection.Group) || feature.HasGroup(selection.Group2))
                     .ForEach(selection => selection.AddFeatures(feature));

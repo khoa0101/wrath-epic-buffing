@@ -14,6 +14,17 @@ namespace BuffIt2TheLimit.Config {
 
 
         public static string Get(string key, Locale locale) {
+            // Base case: enGB is the fallback locale. Without it, a key missing from
+            // en_GB.json recurses forever — an uncatchable StackOverflowException that
+            // kills the game with no log output. Returning the key keeps the UI alive
+            // and makes the missing key visible.
+            if (locale == Locale.enGB) {
+                if (Languages.TryGetValue(Locale.enGB, out var enPack) && enPack.TryGetValue(key, out var enValue))
+                    return enValue;
+                Main.Log($"MISSING LOCALIZATION KEY: {key}");
+                return key;
+            }
+
             if (!Languages.TryGetValue(locale, out var pack))
                 return Get(key, Locale.enGB);
 
