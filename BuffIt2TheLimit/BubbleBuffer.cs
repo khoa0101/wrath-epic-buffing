@@ -480,9 +480,25 @@ namespace BuffIt2TheLimit {
         public ReactiveProperty<string> NameFilter = new("");
         public ButtonGroup<Category> CurrentCategory;
 
+        // Subscriptions bound to the current window instance. CreateWindow runs again
+        // on every party-size rebuild while the controller (and its ReactiveProperty
+        // fields above, plus view) persists — without disposal each rebuild stacks
+        // another handler: RefreshFiltering fires N times per toggle, SortByName saves
+        // N times, and stale handlers touch destroyed widgets.
+        private readonly List<IDisposable> windowSubscriptions = new();
+
+        private void DisposeWindowSubscriptions() {
+            foreach (var sub in windowSubscriptions) {
+                try { sub.Dispose(); } catch { /* stale subscription — nothing to release */ }
+            }
+            windowSubscriptions.Clear();
+        }
+
         public GameObject expandButtonPrefab;
 
         private void CreateWindow() {
+            DisposeWindowSubscriptions();
+
             var staticRoot = UIHelpers.StaticRoot;
 
 
@@ -555,6 +571,9 @@ namespace BuffIt2TheLimit {
             MakeGroupHolder(portraitPrefab, expandButtonPrefab, buttonPrefab, _targetsSection);
             Main.Verbose("made group holder");
 
+            // Clear first: AssetLoader.Materials returns the same instances every call,
+            // so re-adding on each window rebuild would animate them N times per frame
+            _ToAnimate.Clear();
             var partialOverlay = AssetLoader.Materials["bubbly_overlay"];
             partialOverlay.SetFloat("_Speed", 0.3f);
             partialOverlay.SetFloat("_Warmup", 1);
@@ -573,35 +592,35 @@ namespace BuffIt2TheLimit {
 
 
 
-            ShowHidden.Subscribe<bool>(show => {
+            windowSubscriptions.Add(ShowHidden.Subscribe<bool>(show => {
                 RefreshFiltering();
-            });
-            ShowNotRequested.Subscribe<bool>(show => {
+            }));
+            windowSubscriptions.Add(ShowNotRequested.Subscribe<bool>(show => {
                 RefreshFiltering();
-            });
-            ShowRequested.Subscribe<bool>(show => {
+            }));
+            windowSubscriptions.Add(ShowRequested.Subscribe<bool>(show => {
                 RefreshFiltering();
-            });
-            ShowShort.Subscribe<bool>(show => {
+            }));
+            windowSubscriptions.Add(ShowShort.Subscribe<bool>(show => {
                 RefreshFiltering();
-            });
-            NameFilter.Subscribe<string>(val => {
+            }));
+            windowSubscriptions.Add(NameFilter.Subscribe<string>(val => {
                 if (search.InputField.text != val)
                     search.InputField.text = val;
                 RefreshFiltering();
-            });
+            }));
             SortByName.Value = state.SavedState.SortByName;
-            SortByName.Subscribe<bool>(show => {
+            windowSubscriptions.Add(SortByName.Subscribe<bool>(show => {
                 if (state.SavedState.SortByName != show) {
                     state.SavedState.SortByName = show;
                     state.Save(true);
                 }
                 RefreshFiltering();
-            });
+            }));
 
 
 
-            view.currentSelectedSpell.Subscribe(val => {
+            windowSubscriptions.Add(view.currentSelectedSpell.Subscribe(val => {
                 try {
                     HideCasterPopout?.Invoke();
                     if (view.currentSelectedSpell.HasValue && view.currentSelectedSpell.Value != null) {
@@ -638,7 +657,7 @@ namespace BuffIt2TheLimit {
                 } catch (Exception e) {
                     Main.Error(e, "SELECTING SPELL");
                 }
-            });
+            }));
             view.OnUpdate = () => {
                 // After RecalculateAvailableBuffs the BuffList holds NEW BubbleBuff
                 // instances; currentSelectedSpell would keep pointing at an orphan and
@@ -1143,11 +1162,11 @@ namespace BuffIt2TheLimit {
             CurrentCategory.Add(Category.Toggle, "cat.Toggles".i8(), GlobalBubbleBuffer.tabTogglesIcon);
 
 
-            ShowShort.BindToView(showShort);
-            ShowHidden.BindToView(showHidden);
-            ShowRequested.BindToView(showRequested);
-            ShowNotRequested.BindToView(showNotRequested);
-            SortByName.BindToView(sortByName);
+            windowSubscriptions.Add(ShowShort.BindToView(showShort));
+            windowSubscriptions.Add(ShowHidden.BindToView(showHidden));
+            windowSubscriptions.Add(ShowRequested.BindToView(showRequested));
+            windowSubscriptions.Add(ShowNotRequested.BindToView(showNotRequested));
+            windowSubscriptions.Add(SortByName.BindToView(sortByName));
 
             CurrentCategory.Selected.Value = Category.Buff;
         }
@@ -1355,7 +1374,7 @@ namespace BuffIt2TheLimit {
 
             List<(ToggleWorkaround toggle, TextMeshProUGUI text)> ignoreEffectToggles = new();
 
-            MakeSpellLabel("Ignore effects when checking overwrite:");
+            MakeSpellLabel("popout.ignore-overwrite".i8());
             for (int i = 0; i < 8; i++) {
                 int index = i;
                 var effectToggle = MakeSpellPopoutToggle("BlahblahBuff");
@@ -3184,9 +3203,11 @@ namespace BuffIt2TheLimit {
 
     public static class ReactiveBindings {
 
-        public static void BindToView(this IReactiveProperty<bool> prop, GameObject toggle) {
+        // Returns the subscription so callers can dispose it on window rebuild —
+        // the property outlives the toggle it is bound to.
+        public static IDisposable BindToView(this IReactiveProperty<bool> prop, GameObject toggle) {
             var view = toggle.GetComponentInChildren<ToggleWorkaround>();
-            prop.Subscribe<bool>(val => {
+            var subscription = prop.Subscribe<bool>(val => {
                 if (view.isOn != val) {
                     view.isOn = val;
                 }
@@ -3197,6 +3218,7 @@ namespace BuffIt2TheLimit {
                     prop.Value = val;
             });
 
+            return subscription;
         }
 
     }
@@ -3444,6 +3466,9 @@ namespace BuffIt2TheLimit {
                     button.OnHover.AddListener(hover => {
                         PreviewReceivers(hover ? buff : null);
                     });
+                    // Defensive pair with OnHover above: widgets from the cache may carry
+                    // listeners from a previous binding (double-fire on click)
+                    button.OnSingleLeftClick.RemoveAllListeners();
                     button.OnSingleLeftClick.AddListener(() => {
                         if (previousSelection != null && previousSelection != button) {
                             previousSelection.IsPressed = false;

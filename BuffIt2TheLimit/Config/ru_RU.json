@@ -1,4 +1,5 @@
 {
+  "popout.ignore-overwrite": "Игнорировать эффекты при проверке перезаписи:",
   "buffsetup": "Бафы",
   "buffexit": "Выход",
   "casting": "каст",

@@ -1,4 +1,5 @@
 {
+  "popout.ignore-overwrite": "Ignorer les effets lors de la vérification d'écrasement :",
   "buffsetup": "Configuration de buff",
   "buffexit": "Quitter",
   "casting": "Incantation",

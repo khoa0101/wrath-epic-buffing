@@ -1,4 +1,5 @@
 ﻿{
+  "popout.ignore-overwrite": "Effekte beim Overwrite-Check ignorieren:",
   "buffsetup": "Buffs konfigurieren",
   "buffexit": "Exit",
   "casting": "eingesetzt",
