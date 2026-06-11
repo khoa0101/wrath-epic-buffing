@@ -562,8 +562,13 @@ namespace BuffIt2TheLimit {
                 bool bActive = activeIds.Contains(b.who.UniqueId);
                 if (aActive != bActive) return aActive ? -1 : 1;
 
-                int aSourceWeight = sourceOrder[(int)a.SourceType];
-                int bSourceWeight = sourceOrder[(int)b.SourceType];
+                // GetSourceOrder only covers Spell/Scroll/Potion/Equipment (indices 0-3).
+                // Song/Activatable providers shouldn't reach a non-activatable buff's
+                // queue, but an out-of-range SourceType must not crash the sort.
+                int aType = (int)a.SourceType;
+                int bType = (int)b.SourceType;
+                int aSourceWeight = aType < sourceOrder.Length ? sourceOrder[aType] : sourceOrder.Length;
+                int bSourceWeight = bType < sourceOrder.Length ? sourceOrder[bType] : sourceOrder.Length;
                 if (aSourceWeight != bSourceWeight)
                     return aSourceWeight - bSourceWeight;
 
