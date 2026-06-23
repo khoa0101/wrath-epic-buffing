@@ -7,24 +7,23 @@ jobs:
   list:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve mod id and list files for mod 948
+      - name: Probe Nexus v3 endpoints for file ids
         env:
           NEXUS_API_KEY: ${{ secrets.NEXUSMODS_API_KEY }}
         run: |
-          echo "=== game-scoped mod 948 ==="
           MOD_JSON=$(curl -s -H "apikey: $NEXUS_API_KEY" \
             "https://api.nexusmods.com/v3/games/pathfinderwrathoftherighteous/mods/948")
-          echo "$MOD_JSON" | jq '.' 2>/dev/null || echo "$MOD_JSON"
+          MOD_ID=$(echo "$MOD_JSON" | jq -r '.data.id')
+          echo "### numeric mod id: $MOD_ID"
 
-          MOD_ID=$(echo "$MOD_JSON" | jq -r '.data.id // .id // empty' 2>/dev/null)
-          echo "=== resolved numeric mod id: '$MOD_ID' ==="
+          probe() {
+            echo ""
+            echo "### GET $1"
+            curl -s -H "apikey: $NEXUS_API_KEY" -w "\n--- HTTP %{http_code} ---\n" \
+              "https://api.nexusmods.com$1" | head -c 4000
+            echo ""
+          }
 
-          echo "=== files for mod $MOD_ID ==="
-          FILES_JSON=$(curl -s -H "apikey: $NEXUS_API_KEY" \
-            "https://api.nexusmods.com/v3/mods/$MOD_ID/files")
-          # Print id + name + version + category per file; fall back to raw on schema mismatch
-          echo "$FILES_JSON" | jq -r '
-            (.data // .files // .) as $f
-            | ($f | if type=="array" then . else (.data // []) end)[]
-            | "id=\(.id)  name=\(.name // .file_name)  version=\(.version)  category=\(.category // .file_category)"
-          ' 2>/dev/null || echo "$FILES_JSON"
+          probe "/v3/mods/$MOD_ID/files"
+          probe "/v3/mods/$MOD_ID/file-update-groups"
+          probe "/v3/mod-file-update-groups/7180141/versions"
