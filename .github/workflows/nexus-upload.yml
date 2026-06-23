@@ -4,11 +4,11 @@ on:
   release:
     types: [published]
   # Manual re-upload for a given tag (e.g. when a release-triggered run failed).
-  # Runs from the default branch, so it always uses the current (fixed) workflow.
+  # Runs from the default branch, so it always uses the current workflow.
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag to (re)upload to Nexus (e.g. v1.14.7)"
+        description: "Release tag to (re)upload to Nexus (e.g. v1.14.8)"
         required: true
 
 jobs:
@@ -45,15 +45,20 @@ jobs:
             echo "NEXUS_DESC_EOF"
           } >> "$GITHUB_ENV"
 
-      # Pinned to the last release before the 2026-06-17 breaking migration
-      # (PR #29 "Migrate to createModFileVersion"), which renamed the inputs and
-      # made `file_id` required. beta.7 keeps the file_group_id flow used here.
+      # Nexus v3 createModFileVersion flow: POST /mod-files/{file_id}/versions.
+      # file_id is the mod-file id from GET /v3/mods/{numeric_mod_id}/files
+      # (-> data.mod_files[].id). This mod has a single file, so its id (7180141)
+      # equals the old file_group_id value — same number, different resource.
+      # Pinned to an immutable tag — NEVER @main: a moving branch shipped the
+      # 2026-06-17 breaking input migration that took down v1.14.7's auto-upload.
+      # Bump this tag deliberately, never track a branch.
       - name: Upload to Nexus Mods
-        uses: Nexus-Mods/upload-action@v1.0.0-beta.7
+        uses: Nexus-Mods/upload-action@v1.0.0-beta.8
         with:
           api_key: ${{ secrets.NEXUSMODS_API_KEY }}
-          file_group_id: ${{ vars.NEXUSMODS_FILE_GROUP_ID }}
+          file_id: ${{ vars.NEXUSMODS_FILE_ID }}
           filename: ${{ env.ZIP_FILE }}
           version: ${{ env.VERSION }}
           description: ${{ env.DESCRIPTION }}
-          file_category: main
+          category: main
+          allow_mod_manager_download: true
