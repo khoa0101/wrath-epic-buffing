@@ -46,8 +46,11 @@ namespace BuffIt2TheLimit {
             KeyCode.LeftCommand, KeyCode.RightCommand,
             KeyCode.LeftApple, KeyCode.RightApple,
         };
-        private static readonly KeyCode[] KeyboardKeys = ((KeyCode[])Enum.GetValues(typeof(KeyCode)))
-            .TakeWhile(kc => kc < KeyCode.Mouse0)
+        // Keyboard keys plus the extra mouse buttons (thumb + side: Mouse3..Mouse6).
+        // LMB/RMB/MMB (Mouse0..Mouse2) and joystick buttons (>= Mouse6's successor) are
+        // excluded — LMB arms the rebind row and would self-capture; RMB/MMB are game controls.
+        private static readonly KeyCode[] BindableKeys = ((KeyCode[])Enum.GetValues(typeof(KeyCode)))
+            .Where(kc => kc < KeyCode.Mouse0 || (kc >= KeyCode.Mouse3 && kc <= KeyCode.Mouse6))
             .Where(kc => !ModifierKeys.Contains(kc))
             .ToArray();
         private static readonly BuffGroup[] BuffGroups = (BuffGroup[])Enum.GetValues(typeof(BuffGroup));
@@ -102,7 +105,7 @@ namespace BuffIt2TheLimit {
 
             // Handle keyboard shortcut capture
             if (CapturingActive) {
-                foreach (KeyCode kc in KeyboardKeys) {
+                foreach (KeyCode kc in BindableKeys) {
                     if (Input.GetKeyDown(kc)) {
                         var binding = kc == KeyCode.Escape ? ShortcutBinding.None : ShortcutBinding.Capture(kc);
                         OnShortcutCaptured?.Invoke(binding);
