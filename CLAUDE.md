@@ -53,6 +53,7 @@ Use `/release` skill to handle this automatically.
 
 - UI strings: `"key".i8()` (`Config/ModSettings.cs`); keys live in `Config/{en_GB,de_DE,fr_FR,ru_RU,zh_CN}.json` — every new key must be added to ALL five files. A key missing from en_GB.json crashes the game (uncatchable infinite recursion in `Language.Get` — enGB is the fallback locale).
 - BOM differs per file (en_GB/de_DE have UTF-8 BOM, fr/ru/zh don't) — preserve each file's state. Python: read `utf-8-sig`, write BOM back only where it was.
+- Für einzeilige Key-Inserts reicht `sed -i '/anchor/a\  "key": "value",'` — BOM hängt an Zeile 1, sed-Edits darunter lassen es intakt. Danach: `head -c3 | od -An -tx1` (efbbbf = BOM) + JSON-Validierung.
 
 ## Release
 
@@ -64,6 +65,7 @@ Use `/release minor|patch|major` — the skill handles version bump, build, tag,
 - **Fetching in-game logs:** run `/check-logs` (user-invoked skill) to tail + filter the Steam Deck `Player.log` for mod-related exceptions after a deploy/repro. It greps `Player.log` for `BuffIt2TheLimit|Exception|Error|…` over SSH (`deck-direct`).
 - **"Character can't move after entering a map, clicking the buff button fixes it"**: Game-side stuck-command bug (known after area transitions/cutscenes, esp. Chapter 5). The mod does nothing on area load — `SpellbookWatcher.OnAreaActivated` only installs UI and revalidates the ability cache. The buff button "fixes" it because any new `Commands.Run` interrupts the stuck slot occupant. Workarounds: attack something, save/load, or disable the mod to confirm (Ctrl+F10).
 - **"Mount toggle in the Toggle tab only changes the cursor, the rider doesn't mount"**: Not a mod feature — Mount is a stock game `ActivatableAbilityMount` the activatable scan surfaces like any free toggle. The mod only sets `IsOn=true` (Phase 0); real mounting is a targeted command (`ContextActionMount` → `UnitPartRider.Mount(targetUnit,…)`) needing a designated mount, which an on/off toggle can't supply. Not tied to a specific mount, not mod-fixable without dedicated mount-target handling (out of scope).
+- **"Skipped buffs are never shown / log says applied 0/0"**: Fixed in v1.14.9. Ursache war der `Fulfilled > 0`-Filter im Executor + `IsAvailable`-Skip in `Validate()` (Details: `claude-context/gotchas-casting.md`). Bei Reports mit älterer Version: Update empfehlen. Combat-Start-Pfad + Activatables haben den Silent-Drop noch (bewusst, Player.log-only).
 - **"Can you add summon/conjure spells (e.g. Summon Spirit Paladin)?"**: No — won't-do (evaluated 2026-06-28). Summons are point-targeted ("summoned monsters appear where you designate"), so there's no party member to assign them to. The scan rejects them (summon actions, not `ContextActionApplyBuff`; `TargetAnchor != Owner` so the self-target fallback misses) and the cast pipeline assumes a unit target. Even if built, ~1-min duration makes them pointless in a pre-combat buff routine. Not worth a point-target cast-path rewrite.
 
 ## Topic Index
