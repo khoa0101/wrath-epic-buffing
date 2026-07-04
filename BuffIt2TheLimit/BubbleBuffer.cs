@@ -2641,7 +2641,8 @@ namespace BuffIt2TheLimit {
                 elements.Add(new TooltipBrickSeparator());
 
                 foreach (var r in bad) {
-                    elements.Add(new TooltipBrickIconAndName(r.buff.Spell.Icon, $"<b>{r.buff.Name}</b>", TooltipBrickElementType.Small));
+                    // buff.Icon, not buff.Spell.Icon — null-safe for fused/MagicHack spells
+                    elements.Add(new TooltipBrickIconAndName(r.buff.Icon, $"<b>{r.buff.Name}</b>", TooltipBrickElementType.Small));
                     foreach (var msg in r.messages)
                         elements.Add(new TooltipBrickText("   " + msg));
 
@@ -2673,7 +2674,7 @@ namespace BuffIt2TheLimit {
                     }
                     if (r.ExtendRodUsed)
                         label += $" [{"log.extend-rod-applied".i8()}]";
-                    elements.Add(new TooltipBrickIconAndName(r.buff.Spell.Icon, label, TooltipBrickElementType.Small));
+                    elements.Add(new TooltipBrickIconAndName(r.buff.Icon, label, TooltipBrickElementType.Small));
                 }
             }
         }
@@ -2805,6 +2806,7 @@ namespace BuffIt2TheLimit {
         internal static Sprite scrollOverlayIcon;
         internal static Sprite potionOverlayIcon;
         internal static Sprite equipmentOverlayIcon;
+        private static bool blueprintIconsLoadAttempted;
 
         internal static Sprite tabBuffsIcon;
         internal static Sprite tabEquipmentIcon;
@@ -2815,6 +2817,58 @@ namespace BuffIt2TheLimit {
         internal static Sprite groupNormalIcon;
         internal static Sprite groupImportantIcon;
         internal static Sprite groupQuickIcon;
+
+        private static void LoadBlueprintIcons() {
+            if (scrollOverlayIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("e8308a74821762e49bc3211358e81016"); // Scroll of Mage Armor
+                    if (bp != null) scrollOverlayIcon = bp.Icon;
+                } catch { }
+            }
+            if (potionOverlayIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("a4093c3baac79f243b8a204e2b1e33e2"); // Potion of Cure Light Wounds
+                    if (bp != null) potionOverlayIcon = bp.Icon;
+                } catch { }
+            }
+            if (equipmentOverlayIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("0e76af02588cad04a8ea5bfebdc9fb40"); // Wand
+                    if (bp != null) equipmentOverlayIcon = bp.Icon;
+                } catch { }
+            }
+
+            if (tabBuffsIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintAbility>("9e1ad5d6f87d19e4d8c094b114ab2f51"); // Mage Armor
+                    if (bp != null) tabBuffsIcon = bp.Icon;
+                } catch { }
+            }
+            if (tabEquipmentIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("0e76af02588cad04a8ea5bfebdc9fb40"); // Wand
+                    if (bp != null) tabEquipmentIcon = bp.Icon;
+                } catch { }
+            }
+            if (tabAbilitiesIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintAbility>("7bb9eb2042e67bf489c4a7ba8232c6e0"); // Smite Evil
+                    if (bp != null) tabAbilitiesIcon = bp.Icon;
+                } catch { }
+            }
+            if (tabSongsIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintActivatableAbility>("5250c10feed9f8744850fa3b4814e7c0"); // Inspire Courage
+                    if (bp != null) tabSongsIcon = bp.Icon;
+                } catch { }
+            }
+            if (tabTogglesIcon == null) {
+                try {
+                    var bp = Resources.GetBlueprint<BlueprintActivatableAbility>("9972f33f977fc724c838e59641b2fca5"); // Power Attack
+                    if (bp != null) tabTogglesIcon = bp.Icon;
+                } catch { }
+            }
+        }
 
         public List<OwlcatButton> Buttons = new();
 
@@ -2906,55 +2960,12 @@ namespace BuffIt2TheLimit {
                 if (groupQuickIcon == null)
                     groupQuickIcon = AssetLoader.LoadInternal("icons", "apply_buffs_short_normal.png", new Vector2Int(24, 24));
 
-                // Load source-type overlay icons from known game blueprints
-                if (scrollOverlayIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("be452dba5acdd9441bb6f45f350f1f6b"); // Scroll of Mage Armor
-                        if (bp != null) scrollOverlayIcon = bp.Icon;
-                    } catch { }
-                }
-                if (potionOverlayIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("a4093c3baac79f243b8a204e2b1e33e2"); // Potion of Cure Light Wounds
-                        if (bp != null) potionOverlayIcon = bp.Icon;
-                    } catch { }
-                }
-                if (equipmentOverlayIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("0e76af02588cad04a8ea5bfebdc9fb40"); // Wand
-                        if (bp != null) equipmentOverlayIcon = bp.Icon;
-                    } catch { }
-                }
-
-                if (tabBuffsIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintAbility>("9e1ad5d6f87d19e4d8c094b114ab2f51"); // Mage Armor
-                        if (bp != null) tabBuffsIcon = bp.Icon;
-                    } catch { }
-                }
-                if (tabEquipmentIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintItemEquipmentUsable>("0e76af02588cad04a8ea5bfebdc9fb40"); // Wand
-                        if (bp != null) tabEquipmentIcon = bp.Icon;
-                    } catch { }
-                }
-                if (tabAbilitiesIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintAbility>("7bb9eb2042e67bf489c4a7ba8232c6e0"); // Smite Evil
-                        if (bp != null) tabAbilitiesIcon = bp.Icon;
-                    } catch { }
-                }
-                if (tabSongsIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintActivatableAbility>("5250c10feed9f8744850fa3b4814e7c0"); // Inspire Courage
-                        if (bp != null) tabSongsIcon = bp.Icon;
-                    } catch { }
-                }
-                if (tabTogglesIcon == null) {
-                    try {
-                        var bp = Resources.GetBlueprint<BlueprintActivatableAbility>("9972f33f977fc724c838e59641b2fca5"); // Power Attack
-                        if (bp != null) tabTogglesIcon = bp.Icon;
-                    } catch { }
+                // Load source-type overlay and tab icons from known game blueprints.
+                // One attempt only — a missing blueprint would otherwise re-log
+                // "COULD NOT LOAD" on every TryInstallUI (each area load).
+                if (!blueprintIconsLoadAttempted) {
+                    blueprintIconsLoadAttempted = true;
+                    LoadBlueprintIcons();
                 }
 
                 var staticRoot = Game.Instance.UI.Canvas.transform;

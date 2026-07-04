@@ -35,6 +35,7 @@
   "group.short.log": "Schnelle Buffs!",
   "log.skipped": "Übersprungen",
   "log.applied": "Erfolgreich eingesetzt",
+  "log.no-caster": "Kein verfügbarer Zauberwirker",
 
 
   "hideability": "Ausblenden",

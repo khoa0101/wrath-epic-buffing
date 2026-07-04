@@ -35,6 +35,7 @@
   "group.short.log": "Buffs Rapides!",
   "log.skipped": "Ignoré(s)",
   "log.applied": "Appliqué(s)",
+  "log.no-caster": "aucun lanceur de sorts disponible",
 
   "hideability": "Cacher habilité",
 

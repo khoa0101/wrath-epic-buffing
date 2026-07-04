@@ -35,6 +35,7 @@
   "group.short.log": "Быстрые бафы",
   "log.skipped": "Пропущено",
   "log.applied": "Применено",
+  "log.no-caster": "нет доступного заклинателя",
 
   "hideability": "Скрыть способность",
 

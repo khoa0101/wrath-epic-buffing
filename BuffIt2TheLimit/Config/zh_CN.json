@@ -35,6 +35,7 @@
   "group.short.log": "快速施法成功!",
   "log.skipped": "对应效果已存在",
   "log.applied": "已释放",
+  "log.no-caster": "没有可用的施法者",
 
   "hideability": "隐藏能力",
 

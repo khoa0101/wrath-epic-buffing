@@ -343,19 +343,21 @@ namespace BuffIt2TheLimit {
             Dictionary<Kingmaker.Items.ItemEntity, int> remainingRodCharges = new();
             BlueprintScriptableObject arcanistPoolBlueprint = ResourcesLibrary.TryGetBlueprint<BlueprintScriptableObject>("cac948cbbe79b55459459dd6a8fe44ce");
 
-            foreach (var buff in State.BuffList.Where(b => b.InGroups.Contains(buffGroup) && b.Fulfilled > 0)) {
+            // Requested (not Fulfilled) — buffs whose wanted targets all lost their caster
+            // (spell slots spent, no scroll/potion fallback) still need a log entry below.
+            foreach (var buff in State.BuffList.Where(b => b.InGroups.Contains(buffGroup) && b.Requested > 0)) {
 
                 try {
                     if (buff.IsActivatable) continue; // Activatables handled in Phase 0
 
                     int thisBuffGood = 0;
-                    int thisBuffBad = 0;
                     int thisBuffSkip = 0;
                     var thisBuffSourceCounts = new Dictionary<BuffSourceType, int>();
                     bool anyExtendRod = false;
                     TooltipTemplateBuffer.BuffResult badResult = null;
 
-                    foreach (var (target, caster) in buff.ActualCastQueue) {
+                    // Null when Validate() found no castable provider for any wanted target
+                    foreach (var (target, caster) in buff.ActualCastQueue ?? Enumerable.Empty<(string, BuffProvider)>()) {
                         var forTarget = unitBuffs[target];
 
                         // For mass spells, check if ANY wanted target is missing the buff.
@@ -386,7 +388,6 @@ namespace BuffIt2TheLimit {
                             if (badResult == null)
                                 badResult = tooltip.AddBad(buff);
                             badResult.messages.Add($"  [{caster.who.CharacterName}] => [{Bubble.GroupById[target].CharacterName}], {"noslot".i8()}");
-                            thisBuffBad++;
                             continue;
                         }
 
@@ -405,7 +406,6 @@ namespace BuffIt2TheLimit {
                                 if (badResult == null)
                                     badResult = tooltip.AddBad(buff);
                                 badResult.messages.Add($"  [{caster.who.CharacterName}] => [{Bubble.GroupById[target].CharacterName}], {"log.umd-retries-exhausted".i8()}");
-                                thisBuffBad++;
                                 continue;
                             }
                         }
@@ -443,7 +443,6 @@ namespace BuffIt2TheLimit {
                                     if (badResult == null)
                                         badResult = tooltip.AddBad(buff);
                                     badResult.messages.Add($"  [{caster.who.CharacterName}] => [{Bubble.GroupById[target].CharacterName}], {"noarcanist".i8()}");
-                                    thisBuffBad++;
                                     continue;
                                 } else {
                                     remainingArcanistPool[caster.who] = availableArcanistPool - neededArcanistPool;
@@ -516,6 +515,60 @@ namespace BuffIt2TheLimit {
                         thisBuffGood++;
                         thisBuffSourceCounts.TryGetValue(caster.SourceType, out var sc);
                         thisBuffSourceCounts[caster.SourceType] = sc + 1;
+                    }
+
+                    // Wanted targets Validate() couldn't assign any caster for (slots spent,
+                    // no scroll/potion fallback): Validate skips unavailable providers, so
+                    // these never reach ActualCastQueue and previously vanished from the
+                    // report entirely ("applied 0/0 (skipped 0)"). Already-buffed targets
+                    // count as skipped; the rest are failures the user should see.
+                    bool anyNoCaster = false;
+                    if (buff.IsMass) {
+                        // A mass buff is one cast — one report entry, not one per member
+                        if (buff.Fulfilled == 0 && Bubble.Group.Any(buff.UnitWants)) {
+                            bool anyTargetMissingBuff = Bubble.Group.Any(u =>
+                                buff.UnitWants(u) && !buff.BuffsApplied.IsPresent(unitBuffs[u.UniqueId], buff.IgnoreForOverwriteCheck));
+                            if (!anyTargetMissingBuff && !State.OverwriteBuff) {
+                                thisBuffSkip++;
+                                skippedCasts++;
+                            } else {
+                                if (badResult == null)
+                                    badResult = tooltip.AddBad(buff);
+                                badResult.messages.Add($"  {"log.no-caster".i8()}");
+                                attemptedCasts++;
+                                anyNoCaster = true;
+                            }
+                        }
+                    } else {
+                        foreach (var unit in Bubble.Group) {
+                            if (!buff.UnitWants(unit) || buff.UnitGiven(unit))
+                                continue;
+                            if (buff.BuffsApplied.IsPresent(unitBuffs[unit.UniqueId], buff.IgnoreForOverwriteCheck) && !State.OverwriteBuff) {
+                                thisBuffSkip++;
+                                skippedCasts++;
+                            } else {
+                                if (badResult == null)
+                                    badResult = tooltip.AddBad(buff);
+                                badResult.messages.Add($"  [{unit.CharacterName}], {"log.no-caster".i8()}");
+                                attemptedCasts++;
+                                anyNoCaster = true;
+                            }
+                        }
+                    }
+                    // Player.log detail for support — the tooltip line is generic, the
+                    // real rejection reason (slots spent / source disabled / can't target)
+                    // is only known per provider. Mirrors the [CSD] diagnostics pattern.
+                    if (anyNoCaster) {
+                        if (buff.CasterQueue.Count == 0) {
+                            Main.Log($"no caster for '{buff.Name}': no providers found by scan");
+                        } else {
+                            foreach (var c in buff.CasterQueue) {
+                                string reason;
+                                try { reason = buff.DiagnoseCaster(c); }
+                                catch (Exception ex) { reason = $"<diagnose threw: {ex.Message}>"; }
+                                Main.Log($"no caster for '{buff.Name}': {buff.FormatCaster(c)} → {reason}");
+                            }
+                        }
                     }
 
                     if (thisBuffGood > 0) {
