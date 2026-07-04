@@ -92,9 +92,7 @@ Führe alle Checks aus, bevor du irgendetwas änderst.
 
    Nexus-Upload wird automatisch von der GitHub Action übernommen (`.github/workflows/nexus-upload.yml`).
 
-5. **Dem User die Release Notes zeigen** und fragen: „Release Notes so in Ordnung, oder soll ich etwas anpassen?"
-
-   Warte auf Freigabe oder Änderungswünsche. Überarbeite bis der User zustimmt.
+   Keine separate Freigabe-Runde für die Notes — sie werden am Bestätigungs-Gate (Schritt 6) als Vorschau angezeigt und können dort noch beanstandet werden.
 
 ---
 
@@ -230,43 +228,6 @@ Falls die GitHub Action fehlgeschlagen ist, zeige den manuellen Nexus-Upload-Lin
 Nexus Upload (manuell): https://www.nexusmods.com/pathfinderwrathoftherighteous/mods/948?tab=files
 ZIP: BuffIt2TheLimit/bin/BuffIt2TheLimit-X.Y.Z.zip
 ```
-
----
-
-## Schritt 9: Discord Post
-
-Generiere die fertige Discord-Nachricht zum Copy-Pasten in Owlcat's `#mod-updates`-Kanal. Basis sind die „What's New"-Bullets aus Schritt 3, **aber stark gekürzt** — Discord bevorzugt kurze Scan-baren Text, nicht die ausführlichen Erklärungen der GitHub-Release-Notes.
-
-Kürzungsregel: Jeder Bullet max. eine Zeile, nur das WAS (nicht das WARUM/WIE). Entferne Erklärungen in Klammern, technische Details, Root-Cause-Begründungen.
-
-Beispiel:
-- GitHub: „Fixed combat-start auto-cast failing for mass/burst spells (Bless, Prayer, etc.) in parties that have the spell available from both a spellcaster and a wand/scroll. The cast now targets the caster directly to avoid movement interrupts at combat initialization."
-- Discord: „Fixed Bless / mass spells not auto-casting at combat start"
-
-Falls die Bullet-Liste leer wäre (z.B. nur `chore:`-Commits seit letztem Tag), verwende stattdessen den Platzhalter-Bullet `- Maintenance release`.
-
-Ausgabeformat im Terminal (exakt so, inkl. Delimiter-Zeilen):
-
-```
-=== Discord Post (alles zwischen den Zeilen kopieren) ===
-**Buff It 2 The Limit vX.Y.Z**
-
-- <bullet 1>
-- <bullet 2>
-- ...
-
-GitHub: https://github.com/Gh05d/wrath-epic-buffing/releases/tag/vX.Y.Z
-Nexus: https://www.nexusmods.com/pathfinderwrathoftherighteous/mods/948
-=== End Discord Post ===
-```
-
-Regeln:
-
-- Mod-Name + Version in einer Zeile fett (`**...**`), danach eine Leerzeile.
-- Bullets mit `- ` prefix, genau wie in den GitHub-Release-Notes aus Schritt 3.
-- Beide Links als reine URLs (kein Markdown-Link-Syntax) — Discord erzeugt automatisch Previews.
-- Keine „Installation" oder „Requirements" Sektionen — Discord-Post bleibt kurz, Details sind auf Nexus.
-- Schritt 9 ist rein informativ: schlägt er fehl, ist das Release bereits durch (Tag gepushed, GitHub Release live, Nexus Action läuft). Nicht abbrechen, nicht rückgängig machen.
 
 ---
 
