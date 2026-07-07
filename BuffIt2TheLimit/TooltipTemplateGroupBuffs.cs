@@ -1,3 +1,4 @@
+using System;
 using BuffIt2TheLimit.Config;
 using Kingmaker.UI.MVVM._VM.Tooltip.Bricks;
 using Owlcat.Runtime.UI.Tooltips;
@@ -29,10 +30,20 @@ namespace BuffIt2TheLimit {
             elements.Add(new TooltipBrickText($"{KeyPrefix}.tooltip.desc".i8()));
             elements.Add(new TooltipBrickSeparator());
 
-            var buffList = GlobalBubbleBuffer.Instance?.SpellbookController?.state?.BuffList;
-            var assigned = buffList?.Where(b => b.InGroups.Contains(group))
-                                    .OrderBy(b => b.Name)
-                                    .ToList() ?? new List<BubbleBuff>();
+            var state = GlobalBubbleBuffer.Instance?.SpellbookController?.state;
+            if (state != null && state.BuffList == null) {
+                // BuffList stays null until the first scan; populate the same way
+                // the HUD execute path does (BuffExecutor.Execute → Recalculate).
+                try {
+                    state.Recalculate(false);
+                } catch (Exception e) {
+                    Main.Error(e, "recalculating buffs for group tooltip");
+                }
+            }
+
+            var assigned = state?.BuffList?.Where(b => b.InGroups.Contains(group) && b.Requested > 0)
+                                           .OrderBy(b => b.Name)
+                                           .ToList() ?? new List<BubbleBuff>();
 
             if (assigned.Count == 0) {
                 elements.Add(new TooltipBrickText("group.overview.empty".i8()));
