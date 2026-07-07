@@ -50,13 +50,15 @@ namespace BuffIt2TheLimit {
                 return elements;
             }
 
-            foreach (var buff in assigned.Take(MaxEntries)) {
+            // The info window (right-click) scrolls, so it gets the full list; hover stays capped.
+            var shown = type == TooltipTemplateType.Info ? assigned.Count : MaxEntries;
+            foreach (var buff in assigned.Take(shown)) {
                 // buff.Icon, not buff.Spell.Icon — null-safe for fused/MagicHack spells
                 elements.Add(new TooltipBrickIconAndName(buff.Icon, $"<b>{buff.NameMeta}</b>", TooltipBrickElementType.Small));
             }
 
-            if (assigned.Count > MaxEntries) {
-                elements.Add(new TooltipBrickText(string.Format("group.overview.more".i8(), assigned.Count - MaxEntries)));
+            if (assigned.Count > shown) {
+                elements.Add(new TooltipBrickText(string.Format("group.overview.more".i8(), assigned.Count - shown)));
             }
 
             return elements;
