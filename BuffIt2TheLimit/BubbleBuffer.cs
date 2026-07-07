@@ -3843,6 +3843,10 @@ namespace BuffIt2TheLimit {
                 var l = GameObject.Instantiate(BigLabelPrefab, rect.transform);
                 var label = l.GetComponent<TextMeshProUGUI>();
                 label.text = MakeSummaryLabel(group, 0, 0);
+                label.raycastTarget = true;
+                TooltipHelper.SetTooltip(label, new TooltipTemplateGroupBuffs(group), new TooltipConfig {
+                    InfoCallPCMethod = InfoCallPCMethod.None
+                });
                 l.SetActive(true);
                 groupSummaryLabels[group] = label;
             }
