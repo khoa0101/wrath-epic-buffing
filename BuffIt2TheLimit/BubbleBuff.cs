@@ -424,7 +424,7 @@ namespace BuffIt2TheLimit {
                 var src = caster.ActivatableSource ?? ActivatableSource;
                 if (src == null) return "activatable source=null";
                 if (Category != Category.Song && !UnitWants(caster.who)) return $"caster '{caster.who?.CharacterName}' not in wanted set";
-                if (src.IsOn) return "already on";
+                if (BuffExecutor.IsEffectivelyOn(caster.who, src)) return "already on";
                 if (caster.Banned) return "banned";
                 if (!src.IsAvailable) return "not available (resources/restrictions)";
                 return "ok";
@@ -507,7 +507,10 @@ namespace BuffIt2TheLimit {
                 var src = caster.ActivatableSource;
                 if (src == null) continue;
                 if (!UnitWants(caster.who)) continue;
-                if (src.IsOn) {
+                // Effectively-on, not raw IsOn: a targeted toggle (Mount) wedged at
+                // IsOn=true without a target must re-enter the queue so the executor's
+                // mount branch can repair and complete it.
+                if (BuffExecutor.IsEffectivelyOn(caster.who, src)) {
                     given.Add(caster.who.UniqueId);
                     continue;
                 }
