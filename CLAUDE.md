@@ -10,20 +10,7 @@ Buff It 2 The Limit (formerly BubbleBuffs) is a Unity mod for **Pathfinder: Wrat
 ~/.dotnet/dotnet build BuffIt2TheLimit/BuffIt2TheLimit.csproj -p:SolutionDir=$(pwd)/
 ```
 
-**Setup:** The build requires the game's managed DLLs. The csproj references them via `$(WrathInstallDir)/Wrath_Data/Managed/`. This is resolved in order:
-1. `GamePath.props` in repo root (auto-generated or manual)
-2. Auto-detection from `Player.log` (Windows only, uses `findstr`)
-
-For Linux dev, create `GamePath.props` manually or symlink game DLLs:
-```xml
-<Project xmlns='http://schemas.microsoft.com/developer/msbuild/2003'>
-  <PropertyGroup>
-    <WrathInstallDir>/path/to/game/or/symlink</WrathInstallDir>
-  </PropertyGroup>
-</Project>
-```
-
-The build uses `BepInEx.AssemblyPublicizer.MSBuild` to access private/internal game fields (marked with `Publicize="true"` in csproj). Publicized DLLs go to `obj/Debug/publicized/`.
+**Setup:** needs the game's managed DLLs via `GamePath.props` (`<WrathInstallDir>` → `Wrath_Data/Managed/`) and the publicizer — see parent `wrath-mods/CLAUDE.md` §Common Build Setup.
 
 Output: `BuffIt2TheLimit/bin/Debug/BuffIt2TheLimit.dll` + assets copied to output dir. The build target also creates a zip for distribution.
 
@@ -91,7 +78,5 @@ Deep docs live in `claude-context/`. Before editing an area, read the matching f
 
 ## Code Style
 
-- K&R brace style (opening brace on same line): `csharp_new_line_before_open_brace = none`
-- 4-space indentation
-- `var` when type is apparent, explicit type otherwise
+- Shared style (K&R, 4-space, `var`): parent `wrath-mods/CLAUDE.md` §Code Style; editorconfig enforces `csharp_new_line_before_open_brace = none`
 - Game's private fields accessed via publicizer (e.g., `PartyView.m_Hide`, `button.m_CommonLayer`)
