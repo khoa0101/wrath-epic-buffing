@@ -809,27 +809,39 @@ namespace BuffIt2TheLimit {
             }
 
             {
-                var (toggle, _) = MakeSettingsToggle(togglePrefab, scrollContent, "setting-bypass-asf".i8());
+                var (toggle, label) = MakeSettingsToggle(togglePrefab, scrollContent, "setting-bypass-asf".i8());
                 toggle.isOn = state.BypassArcaneSpellFailure;
                 toggle.onValueChanged.AddListener(enabled => {
                     state.BypassArcaneSpellFailure = enabled;
                 });
+                label.raycastTarget = true;
+                TooltipHelper.SetTooltip(label, new TooltipTemplateSimple(
+                    "setting-bypass-asf".i8(),
+                    "setting-bypass-asf-tooltip".i8()));
             }
 
             {
-                var (toggle, _) = MakeSettingsToggle(togglePrefab, scrollContent, "setting-overwritebuff".i8());
+                var (toggle, label) = MakeSettingsToggle(togglePrefab, scrollContent, "setting-overwritebuff".i8());
                 toggle.isOn = state.OverwriteBuff;
                 toggle.onValueChanged.AddListener(enabled => {
                     state.OverwriteBuff = enabled;
                 });
+                label.raycastTarget = true;
+                TooltipHelper.SetTooltip(label, new TooltipTemplateSimple(
+                    "setting-overwritebuff".i8(),
+                    "setting-overwritebuff-tooltip".i8()));
             }
 
             {
-                var (toggle, _) = MakeSettingsToggle(togglePrefab, scrollContent, "setting-verbose".i8());
+                var (toggle, label) = MakeSettingsToggle(togglePrefab, scrollContent, "setting-verbose".i8());
                 toggle.isOn = state.VerboseCasting;
                 toggle.onValueChanged.AddListener(enabled => {
                     state.VerboseCasting = enabled;
                 });
+                label.raycastTarget = true;
+                TooltipHelper.SetTooltip(label, new TooltipTemplateSimple(
+                    "setting-verbose".i8(),
+                    "setting-verbose-tooltip".i8()));
             }
 
             {
@@ -912,6 +924,10 @@ namespace BuffIt2TheLimit {
                 labelObj.SetActive(true);
                 var label = labelObj.GetComponentInChildren<TextMeshProUGUI>();
                 label.text = $"{"setting-umd-retries".i8()}: {state.SavedState.UmdRetries}";
+                label.raycastTarget = true;
+                TooltipHelper.SetTooltip(label, new TooltipTemplateSimple(
+                    "setting-umd-retries".i8(),
+                    "setting-umd-retries-tooltip".i8()));
 
                 var buttonHolder = new GameObject("umd-retries-buttons", typeof(RectTransform));
                 buttonHolder.transform.SetParent(scrollContent);
@@ -953,6 +969,10 @@ namespace BuffIt2TheLimit {
                 labelObj.SetActive(true);
                 var umdText = labelObj.GetComponentInChildren<TextMeshProUGUI>();
                 umdText.text = $"{"setting-umd-mode".i8()}: {GetUmdModeText()}";
+                umdText.raycastTarget = true;
+                TooltipHelper.SetTooltip(umdText, new TooltipTemplateSimple(
+                    "setting-umd-mode".i8(),
+                    "setting-umd-mode-tooltip".i8()));
 
                 var cycleButton = MakeButton(">", scrollContent);
                 cycleButton.GetComponentInChildren<OwlcatButton>().OnLeftClick.AddListener(() => {
@@ -971,6 +991,10 @@ namespace BuffIt2TheLimit {
                 labelObj.SetActive(true);
                 var prioText = labelObj.GetComponentInChildren<TextMeshProUGUI>();
                 prioText.text = $"{"setting-source-priority".i8()}: {SourcePriorityKeys[(int)state.SavedState.GlobalSourcePriority].i8()}";
+                prioText.raycastTarget = true;
+                TooltipHelper.SetTooltip(prioText, new TooltipTemplateSimple(
+                    "setting-source-priority".i8(),
+                    "setting-source-priority-tooltip".i8()));
 
                 var prioCycleButton = MakeButton(">", scrollContent);
                 prioCycleButton.GetComponentInChildren<OwlcatButton>().OnLeftClick.AddListener(() => {
