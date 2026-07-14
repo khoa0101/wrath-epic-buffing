@@ -32,6 +32,9 @@ namespace BuffIt2TheLimit {
         private HashSet<Guid> PrimaryWeaponEnchants;
         private HashSet<Guid> SecondaryWeaponEnchants;
         private HashSet<EnchantPoolType> EnchantPools;
+        // Applied buffs the ability re-grants only when absent (also checked via HasFact Not:true).
+        // Unreliable presence markers — see AbilityCombinedEffects ctor and IsPresent.
+        private HashSet<Guid> SelfGatedBuffs;
         public PetType? PetType = null;
 
         public IEnumerable<(string name, Guid guid)> All {
@@ -86,10 +89,19 @@ namespace BuffIt2TheLimit {
             IsLong |= isLong;
         }
 
-        public AbilityCombinedEffects(IEnumerable<IBeneficialEffect> beneficialEffects) {
+        public AbilityCombinedEffects(IEnumerable<IBeneficialEffect> beneficialEffects, HashSet<Guid> absenceCheckedFacts = null) {
             foreach (var effect in beneficialEffects.EmptyIfNull())
                 effect.AppendTo(this);
             Empty = AppliedBuffs == null && AppliedPetBuffs == null && PrimaryWeaponEnchants == null && SecondaryWeaponEnchants == null && EnchantPools == null;
+
+            // A buff the ability both APPLIES and guards on !HasFact(itself) is re-granted only
+            // when absent (Armored Mask ↔ MageArmorBuff): having it doesn't prove this ability
+            // ran, so it's not a reliable presence marker. IsPresent drops these (empty-fallback).
+            if (absenceCheckedFacts != null && absenceCheckedFacts.Count > 0 && AppliedBuffs != null) {
+                SelfGatedBuffs = AppliedBuffs.Where(absenceCheckedFacts.Contains).ToHashSet();
+                if (SelfGatedBuffs.Count == 0)
+                    SelfGatedBuffs = null;
+            }
         }
 
 
@@ -105,7 +117,16 @@ namespace BuffIt2TheLimit {
             }
 
             if (AppliedBuffs != null) {
-                if (unitBuffData.Buffs.Overlaps(AppliedBuffs.Except(ignoreForOverwriteCheck)))
+                IEnumerable<Guid> markers = AppliedBuffs.Except(ignoreForOverwriteCheck);
+                if (SelfGatedBuffs != null) {
+                    var narrowed = markers.Except(SelfGatedBuffs).ToHashSet();
+                    // Empty-fallback: a pure "apply X if absent" buff (X is the only marker) keeps
+                    // X so it isn't re-cast every run; multi-payload abilities (Armored Mask) narrow
+                    // to their unique buff (the bonus applied when the shared buff is already present).
+                    if (narrowed.Count > 0)
+                        markers = narrowed;
+                }
+                if (unitBuffData.Buffs.Overlaps(markers))
                     return true;
             }
 

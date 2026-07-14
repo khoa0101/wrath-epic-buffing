@@ -878,6 +878,7 @@ namespace BuffIt2TheLimit {
 
                 if (!SpellsWithBeneficialBuffs.TryGetValue(spell.Blueprint.AssetGuid.m_Guid, out var abilityEffect)) {
                     IEnumerable<IBeneficialEffect> beneficial;
+                    var absenceChecked = new HashSet<Guid>();
                     if (spell.MagicHackData != null) {
                         // Fused spells (Magic Deceiver): template blueprint has empty actions.
                         // Check component spells instead.
@@ -886,11 +887,14 @@ namespace BuffIt2TheLimit {
                         var spell2Effects = spell.MagicHackData.Spell2?.GetBeneficialBuffs(skipDamageFilter: isAbilityCategory)
                             ?? Enumerable.Empty<IBeneficialEffect>();
                         beneficial = spell1Effects.Concat(spell2Effects);
+                        if (spell.MagicHackData.Spell1 != null) absenceChecked.UnionWith(spell.MagicHackData.Spell1.GetAbsenceCheckedFacts());
+                        if (spell.MagicHackData.Spell2 != null) absenceChecked.UnionWith(spell.MagicHackData.Spell2.GetAbsenceCheckedFacts());
                         Main.Verbose($"        Fused spell {spell.Name}: checking components {spell.MagicHackData.Spell1?.Name} + {spell.MagicHackData.Spell2?.Name}", "state");
                     } else {
                         beneficial = spell.Blueprint.GetBeneficialBuffs(skipDamageFilter: isAbilityCategory);
+                        absenceChecked = spell.Blueprint.GetAbsenceCheckedFacts();
                     }
-                    abilityEffect = new AbilityCombinedEffects(beneficial);
+                    abilityEffect = new AbilityCombinedEffects(beneficial, absenceChecked);
                     SpellsWithBeneficialBuffs[spell.Blueprint.AssetGuid.m_Guid] = abilityEffect;
                     SpellNames[spell.Blueprint.AssetGuid.m_Guid] = spell.Name;
                 }
