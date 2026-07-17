@@ -36,6 +36,11 @@ Version must be updated in **three** files simultaneously:
 
 Use `/release` skill to handle this automatically.
 
+## Repo Quirks
+
+- `docs/` ist gitignored, aber Specs/Pläne/Nexus-Assets darunter sind getrackt (historisch force-added) — neue Dateien unter `docs/` brauchen `git add -f`.
+- `.superpowers/sdd/progress.md` (SDD-Ledger) überlebt Feature-Runs: vor Vertrauen die Commit-SHAs gegen `git log` prüfen — ein stale Ledger des Vorgänger-Features behauptet sonst „alle Tasks complete". Bei neuem Plan: Header neu schreiben.
+
 ## Localization
 
 - UI strings: `"key".i8()` (`Config/ModSettings.cs`); keys live in `Config/{en_GB,de_DE,fr_FR,ru_RU,zh_CN}.json` — every new key must be added to ALL five files. A key missing from en_GB.json crashes the game (uncatchable infinite recursion in `Language.Get` — enGB is the fallback locale).
@@ -55,6 +60,7 @@ Use `/release minor|patch|major` — the skill handles version bump, build, tag,
 - **"Arcane Weapon / Sacred Weapon / Weapon Bond wird bei jedem Routine-Lauf neu gecastet (obwohl aktiv)"**: Fixed in v1.16.1. `IsPresent` matchte nur die DefaultEnchantments (+1..+5) — bei +5-Waffe oder Pool komplett in Properties legt das Spiel keins davon an. Jetzt via `UnitPartEnchantPoolData` erkannt (Details: `claude-context/gotchas-scanning.md`). Bei Reports mit älterer Version: Update empfehlen.
 - **"Armored Mask (Arcanist Exploit) wird übersprungen, wenn Mage Armor bereits aktiv ist"**: Fixed in v1.18.0. Armored Mask re-appliziert bei fehlender Rüstung den vanilla MageArmorBuff (sonst seinen Bonus-Buff), sein flaches `AppliedBuffs` enthielt also MageArmorBuff → `IsPresent` matchte auf den geteilten Buff und skippte. Jetzt via self-gated-buff-Exclusion erkannt (Details: `claude-context/gotchas-scanning.md`). Bei Reports mit älterer Version: Update empfehlen.
 - **"Skipped buffs are never shown / log says applied 0/0"**: Fixed in v1.14.9. Ursache war der `Fulfilled > 0`-Filter im Executor + `IsAvailable`-Skip in `Validate()` (Details: `claude-context/gotchas-casting.md`). Bei Reports mit älterer Version: Update empfehlen. Combat-Start-Pfad + Activatables haben den Silent-Drop noch (bewusst, Player.log-only).
+- **"Kann ich steuern, welcher Caster einen geteilten Buff zuerst castet?"**: Ja, seit v1.19.0 (Caster Priority): zwei −/+ Zeilen im Caster-Popout — „Priority (all buffs)" (global, `SavedBufferState.CasterRanks[unitId]`) + „Priority (this buff)" (Override, `BuffProvider.PriorityOverride`; grau = erbt). Sortierung in `SortProviders()`: aktiv vor Reserve → Quelltyp → Rang (höher = früher) → prepared vor spontan (höheres CL zuerst) → self-cast-only zuletzt. Prepared-vor-spontan war schon IMMER Default — viele Anfragen dazu sind ohne Rang bereits erfüllt. Bei älteren Versionen: Update empfehlen.
 - **"Can you add summon/conjure spells (e.g. Summon Spirit Paladin)?"**: No — won't-do (evaluated 2026-06-28). Summons are point-targeted ("summoned monsters appear where you designate"), so there's no party member to assign them to. The scan rejects them (summon actions, not `ContextActionApplyBuff`; `TargetAnchor != Owner` so the self-target fallback misses) and the cast pipeline assumes a unit target. Even if built, ~1-min duration makes them pointless in a pre-combat buff routine. Not worth a point-target cast-path rewrite.
 
 ## Topic Index
