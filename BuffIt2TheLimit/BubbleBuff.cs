@@ -243,6 +243,7 @@ namespace BuffIt2TheLimit {
                 if (state.Casters.TryGetValue(caster.Key, out var casterState)) {
                     caster.Banned = casterState.Banned;
                     caster.CustomCap = casterState.Cap;
+                    caster.PriorityOverride = casterState.PriorityOverride;
                     caster.ShareTransmutation = casterState.ShareTransmutation;
                     caster.PowerfulChange = casterState.PowerfulChange;
                     caster.ReservoirCLBuff = casterState.ReservoirCLBuff;
@@ -553,6 +554,7 @@ namespace BuffIt2TheLimit {
             if (IsActivatable) return;
             var globalPriority = GlobalBubbleBuffer.Instance?.SpellbookController?.state?.SavedState?.GlobalSourcePriority
                 ?? SourcePriority.SpellsScrollsPotions;
+            var casterRanks = GlobalBubbleBuffer.Instance?.SpellbookController?.state?.SavedState?.CasterRanks;
             var effectivePriority = SourcePriorityOverride >= 0
                 ? (SourcePriority)SourcePriorityOverride
                 : globalPriority;
@@ -575,7 +577,15 @@ namespace BuffIt2TheLimit {
                 if (aSourceWeight != bSourceWeight)
                     return aSourceWeight - bSourceWeight;
 
-                if (a.Priority == b.Priority) {
+                // Manual caster rank — user override, higher casts earlier. Sits
+                // below active/reserve and source type (a rank must not pull a
+                // reserve companion or a scroll ahead), above the heuristic.
+                int aRank = a.EffectiveRank(casterRanks);
+                int bRank = b.EffectiveRank(casterRanks);
+                if (aRank != bRank)
+                    return bRank - aRank;
+
+                if (a.HeuristicPriority == b.HeuristicPriority) {
                     int aScore = 0;
                     int bScore = 0;
 
@@ -586,7 +596,7 @@ namespace BuffIt2TheLimit {
 
                     return aScore - bScore;
                 } else {
-                    return a.Priority - b.Priority;
+                    return a.HeuristicPriority - b.HeuristicPriority;
                 }
             });
         }
@@ -657,6 +667,9 @@ namespace BuffIt2TheLimit {
 
         public bool Banned = false;
         public int CustomCap = -1;
+        // Manual caster rank override for this buff — null inherits the global
+        // per-unit rank (SavedBufferState.CasterRanks). Higher rank casts earlier.
+        public int? PriorityOverride;
         private int ClampForCap => CustomCap == -1 ? int.MaxValue : CustomCap;
         internal int MaxCap;
 
@@ -676,7 +689,7 @@ namespace BuffIt2TheLimit {
 
         public AbilityData SlottedSpell => baseSpell ?? spell;
 
-        public int Priority {
+        public int HeuristicPriority {
             get {
                 if (book == null)
                     return 0;
@@ -688,6 +701,11 @@ namespace BuffIt2TheLimit {
                 }
             }
         }
+
+        // Effective manual rank: per-buff override wins, else the global
+        // per-unit rank, else 0. Higher casts earlier (SortProviders).
+        public int EffectiveRank(Dictionary<string, int> globalRanks) =>
+            PriorityOverride ?? (globalRanks != null && globalRanks.TryGetValue(who.UniqueId, out var rank) ? rank : 0);
 
         public class ForceShareTransmutation : IDisposable {
             private BuffProvider unit;

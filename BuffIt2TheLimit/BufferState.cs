@@ -678,6 +678,7 @@ namespace BuffIt2TheLimit {
                     }
                     state.Banned = caster.Banned;
                     state.Cap = caster.CustomCap;
+                    state.PriorityOverride = caster.PriorityOverride;
                     state.ShareTransmutation = caster.ShareTransmutation;
                     state.PowerfulChange = caster.PowerfulChange;
                     state.ReservoirCLBuff = caster.ReservoirCLBuff;
@@ -698,12 +699,14 @@ namespace BuffIt2TheLimit {
             // it must create AND retain a SavedBuffState even when no target wants the
             // buff yet, otherwise bans evaporate on the next provider rebuild.
             bool hasCasterConfig(BubbleBuff buff) => buff.CasterQueue.Any(c =>
-                c.Banned || c.CustomCap != -1 || c.ShareTransmutation || c.PowerfulChange
+                c.Banned || c.CustomCap != -1 || c.PriorityOverride != null
+                || c.ShareTransmutation || c.PowerfulChange
                 || c.ReservoirCLBuff || c.AzataZippyMagic);
             // For retention, check the SAVED dict, not the current queue: it also holds
             // config for providers temporarily absent (scrolls depleted, caster benched).
             bool hasSavedCasterConfig(SavedBuffState save) => save.Casters.Values.Any(c =>
-                c.Banned || c.Cap != -1 || c.ShareTransmutation || c.PowerfulChange
+                c.Banned || c.Cap != -1 || c.PriorityOverride != null
+                || c.ShareTransmutation || c.PowerfulChange
                 || c.ReservoirCLBuff || c.UseAzataZippyMagic);
 
             if (!shallow) {
